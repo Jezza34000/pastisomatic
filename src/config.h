@@ -17,6 +17,7 @@
 #define BUTTON_3 25
 #define BUTTON_4 27
 
+#define NUM_LEDS 4
 #define LED_1 32
 #define LED_2 33
 #define LED_3 26
@@ -72,5 +73,9 @@ PWM 	Tension (V)
 // Throttle speed single use function
 #define ONLY_WATER_SPEED 150
 #define ONLY_ALC_SPEED 150
+
+// Start duration
+#define WATER_START_DURATION 3000
+#define ALC_START_DURATION 3000
 
 #endif // CONFIG_H

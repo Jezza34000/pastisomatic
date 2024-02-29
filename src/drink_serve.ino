@@ -1,10 +1,10 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
 #include "config.h"
 
 // Screen declaration
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // Global var
 int drink_intensity = 0; // % from 0 to 100
@@ -13,10 +13,26 @@ int lastSteadyState[NUM_BUTTONS] = {HIGH,HIGH,HIGH,HIGH};
 int currentState[NUM_BUTTONS];
 unsigned long lastDebounceTime[NUM_BUTTONS] = {0};
 
+const int led_mapping[NUM_LEDS] = {LED_1, LED_2, LED_3, LED_4};
+
+const bool allOff[NUM_LEDS] = {false, false, false, false};
+const bool allOn[NUM_LEDS] = {true, true, true, true};
+const bool led_1[NUM_LEDS] = {true, false, false, false};
+const bool led_2[NUM_LEDS] = {false, true, false, false};
+const bool led_3[NUM_LEDS] = {false, false, true, false};
+const bool led_4[NUM_LEDS] = {false, false, false, true};
+
 void set_pump_pwm(int pumpPin, int speed) {
   // Set L298N PWM pump
   // pumpPin (int) : EN A/B pin
   // speed (int) : Value from 0 to 255
+
+  if (pumpPin == WATER_PUMP && speed > 0) {
+    valve_tank(true);
+  } else {
+    valve_tank(false);
+  }
+
   Serial.println("Set pump PWM " + String(pumpPin) + " at : " + String(speed));
   analogWrite(pumpPin, speed);
 }
@@ -32,60 +48,120 @@ void valve_tank(bool state) {
   }
 }
 
-void ihm_update(int led_pin, bool action_type) {
-  // LED actions
-  Serial.println("Set LED n" + String(led_pin) + " to state : " + String(action_type));
-  if (action_type == true) {
-    ledcWrite(LEDC_CHANNEL, 0);
-    digitalWrite(led_pin, HIGH);
-  } else {
-    digitalWrite(led_pin, LOW);
+void led_control(const bool booleanList[NUM_LEDS]) {
+    for (int i = 0; i < NUM_LEDS; ++i) {
+        if (booleanList[i]) {
+            // Allumer la LED correspondante
+            digitalWrite(led_mapping[i], HIGH);
+            Serial.print("LED ");
+            Serial.print(i+1);
+            Serial.println(" allumée.");
+        } else {
+            // Éteindre la LED correspondante
+            digitalWrite(led_mapping[i], LOW);
+            Serial.print("LED ");
+            Serial.print(i+1);
+            Serial.println(" éteinte.");
+        }
+    }
+}
+
+void fadeAnimation(int totalDuration) {
+  int fadeDuration = totalDuration / 2; // Durée de chaque phase de fondu
+  int delayTime = 5; // Définir le délai fixe
+  
+  while (fadeDuration > 0) { // Tant qu'il reste du temps pour faire un fondu
+    // Fade-in
+    for (int dutyCycle = 0; dutyCycle <= 255; dutyCycle += 5) {
+      ledcWrite(LEDC_CHANNEL, dutyCycle);
+      delay(delayTime);
+    }
+    
+    // Fade-out
+    for (int dutyCycle = 255; dutyCycle >= 0; dutyCycle -= 5) {
+      ledcWrite(LEDC_CHANNEL, dutyCycle);
+      delay(delayTime);
+    }
+    
+    fadeDuration -= 2 * delayTime * 51; // Soustraire le temps utilisé pour un fondu complet
   }
 }
 
-void display_message(int intensity) {
-  String message;
+void display_message(int message) {
 
   display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("Service...");
-  display.println(message);
+  display.setTextColor(SH110X_WHITE);
 
-
-  // From 0 to 100
-  if (intensity == 0) {
-    message = "L'eau c'est la vie !";
-  } else if (intensity >= 1 && intensity <= 10) {
-    message = "Tu as de la fièvre ?";
-  } else if (intensity > 10 && intensity <= 25) {
-    message = "Pastis d'enfant ça";
-  } else if (intensity > 25 && intensity <= 45) {
-    message = "Mouais";
-  } else if (intensity > 45 && intensity <= 65) {
-    message = "Parfait";
-  } else if (intensity > 65 && intensity <= 80) {
-    message = "Il est bien là";
-  } else if (intensity > 80 && intensity <= 90) {
-    message = "Flanby";
-  } else if (intensity > 90 && intensity < 100) {
-    message = "Tu as une cuillère?";
-  } else if (intensity == 100) {
-    message = "Plus fort... y'a pas !";
+  switch(message) {
+    case 0:
+      display.setTextSize(2);
+      display.setCursor(15, 25);
+      display.println("Pret !");
+      display.display(); 
+      break;
+    case 1:
+      display.setTextSize(2);
+      display.setCursor(15, 10);
+      display.println("Tchin");
+      display.setCursor(40, 35);
+      display.println("Tchin !");
+      break;
+    case 2:
+      display.setTextSize(2);
+      display.setCursor(15, 10);
+      display.println("Ajout...");
+      display.setCursor(15, 25);
+      display.setTextSize(3);
+      display.println("Eau");
+      display.display();
+      break;
+    case 3:
+      display.setTextSize(2);
+      display.setCursor(15, 10);
+      display.println("Ajout...");
+      display.setCursor(15, 25);
+      display.setTextSize(3);
+      display.println("Pastis");
+      display.display();
+      break;
+    case 4:
+      display.setTextSize(2);
+      display.setCursor(5, 20);
+      display.println("Service...");
+      break;
+    case 5:
+      display.setTextSize(1);
+      display.setCursor(5, 9);
+      display.println("Amorcage pompes...");
+      display.setCursor(5, 25);
+      display.println("-> Eau");
+      break;
+    case 6:
+      display.setTextSize(1);
+      display.setCursor(5, 9);
+      display.println("Amorcage pompes...");
+      display.setCursor(5, 25);
+      display.println("-> Eau");
+      display.setCursor(5, 40);
+      display.println("-> Pastis");
+      break;
+    case 7:
+      display.setTextSize(3);
+      display.setCursor(5, 10);
+      display.println("Non...");
+      display.setTextSize(2);
+      display.setCursor(5, 35);
+      display.println("Trop fort");
+      break;
+    case 8:
+      display.setTextSize(3);
+      display.setCursor(5, 10);
+      display.println("Euh...");
+      display.setTextSize(2);
+      display.setCursor(5, 35);
+      display.println("De l'eau ?");
+      break;
   }
-  // Special message
-  if (intensity == 1111) {
-    message = "Y'a rien ici !";
-  } else if (intensity == 2222) {
-    message = "Petit joueur va !";
-  } else if (intensity == 3333) {
-    message = "La prochaine fois tourne plus le dosage vers la droite !";
-  } else if (intensity == 9999) {
-    message = "Tchin-Tchin !";
-  }
-
-
   display.display();
 }
 
@@ -93,49 +169,58 @@ void process_actions(int choice) {
   // Actions process
   // Pump & Valve
   Serial.println(">>> Action :");
+
   switch(choice) {
     case 0:
       // Arrêt
       Serial.println("-> Stop");
       set_pump_pwm(ALC_PUMP, 0);
-      set_pump_pwm(WATER_PUMP, 0);
-      valve_tank(false);
-      ihm_update(LED_1, false);
-      ihm_update(LED_2, false);
-      ihm_update(LED_3, false);
-      ihm_update(LED_4, false);
+      set_pump_pwm(WATER_PUMP, 0);   
+      led_control(allOff);
       ledcWrite(LEDC_CHANNEL, 255);
+      display_message(1);
       break;
+
     case 1:
-      // Button 1 BACK-LEFT (undefined)
-      Serial.println("-> undefined");
-      ihm_update(LED_1, true);
-      display_message(1111);
+      // Button 1 BACK-LEFT (Start&Clean)
+      Serial.println("-> Start&Clean");
+      led_control(led_1);
+      display_message(5);
+      set_pump_pwm(ALC_PUMP, ALC_PUMP_SPEED_MAX_PWM);
+      set_pump_pwm(WATER_PUMP, WATER_PUMP_SPEED_MAX_PWM);
+      fadeAnimation(5000);
+      set_pump_pwm(ALC_PUMP, 0);
+      display_message(6);
+      fadeAnimation(5000);
+      set_pump_pwm(WATER_PUMP, 0);
+      display_message(0);
       break;
+
     case 2:
       // Button 2 BACK-RIGHT (Add water)
       Serial.println("-> Add water");
-      ihm_update(LED_2, true);
-      valve_tank(true);
-      display_message(2222);
+      led_control(led_2);
+      display_message(2);
       set_pump_pwm(WATER_PUMP, ONLY_WATER_SPEED);
       break;
+
     case 3:
       // Button 3 FRONT-LEFT (Add pastis)
       Serial.println("-> Add pastis");
-      ihm_update(LED_3, true);
-      display_message(3333);
+      led_control(led_3);
+      display_message(3);
       set_pump_pwm(ALC_PUMP, ONLY_ALC_SPEED);
       break;
+
     case 4:
       // Button 3 FRONT-RIGHT (Mix pastis+eau)
       Serial.println("-> Serve");
-      ihm_update(LED_4, true);
-      valve_tank(true);
-      display_message(drink_intensity);
+      led_control(led_4);
+      display_message(4);
       set_pump_pwm(ALC_PUMP, map(drink_intensity, 0, 100, ALC_PUMP_SPEED_MIN_PWM, ALC_PUMP_SPEED_MAX_PWM));
       set_pump_pwm(WATER_PUMP, map(drink_intensity, 0, 100, WATER_PUMP_SPEED_MIN_PWM, WATER_PUMP_SPEED_MAX_PWM));
       break;
+
     default:
       Serial.println("processAction not found :" + String(choice));
       break;
@@ -162,32 +247,21 @@ void handlebuttons() {
     }
   }
 }
-/*
-    // Button breathing effect
-    while(currentState[i] == LOW) {
-      // increase the LED brightness
-      for(int dutyCycle = 0; dutyCycle <= 255; dutyCycle += 5){   
-        ledcWrite(LEDC_CHANNEL, dutyCycle);
-        delay(10);
-      }
-
-      currentState[i] = digitalRead(buttonPins[i]);
-      // decrease the LED brightness
-      for(int dutyCycle = 255; dutyCycle >= 0; dutyCycle -= 5){
-        ledcWrite(LEDC_CHANNEL, dutyCycle);   
-        delay(10);
-      }
-      currentState[i] = digitalRead(buttonPins[i]);
-    }
-  }
-*/
-
-
 
 void setup() {
   // Init debug output
   Serial.begin(115200);
   Serial.println("Pastis-O-matic initializing...");
+
+  // LCD OLED I2C Init
+  display.begin(SCREEN_ADDRESS, true);
+
+  display.clearDisplay();
+  display.setTextSize(1); 
+  display.setTextColor(SH110X_WHITE);             
+  display.setCursor(0,0); 
+  display.println("Initializing...");
+  display.display();
   
   // ESP32 Hardware init pins
   // Buttons
@@ -197,10 +271,9 @@ void setup() {
   pinMode(BUTTON_4, INPUT_PULLUP);
   
   // Led ON/OFF
-  pinMode(LED_1, OUTPUT);
-  pinMode(LED_2, OUTPUT);
-  pinMode(LED_3, OUTPUT);
-  pinMode(LED_4, OUTPUT);
+  for (int i = 0; i < NUM_LEDS; ++i) {
+      pinMode(led_mapping[i], OUTPUT);
+  }
 
   // Led PWM
   ledcSetup(LEDC_CHANNEL, PWM_FREQ, PWM_RESOLUTION);
@@ -214,15 +287,6 @@ void setup() {
   pinMode(WATER_PUMP_IN2, OUTPUT);
   pinMode(ALC_PUMP_IN3, OUTPUT);
   pinMode(ALC_PUMP_IN4, OUTPUT);
-
-  // Boot state init
-  // Turn OFF all button's LED
-  digitalWrite(LED_1, LOW);
-  digitalWrite(LED_2, LOW);
-  digitalWrite(LED_3, LOW);
-  digitalWrite(LED_4, LOW);
-  // Turn ON potentiometer Led
-  digitalWrite(POTENTIOMETER_LED, HIGH);
   
   // Configure L298N rotation (clockwise)
   // Pump does not allow anti-clockwise
@@ -235,22 +299,13 @@ void setup() {
   // it's not self-priming
   valve_tank(true);
 
-  // LCD I2C Init
-  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
-  }
-
-  display.clearDisplay();
-  display.setTextSize(1);           
-  display.setTextColor(SSD1306_WHITE);      
-  display.setCursor(0,0); 
-  display.println("Pastis-o-matic");
-  display.display();
-
+  led_control(allOn);
+  delay(500);
+  led_control(allOff);
   // Start animation fade-in for drink intensity led
   for(int dutyCycle = 0; dutyCycle <= 255; dutyCycle ++){   
     ledcWrite(LEDC_CHANNEL, dutyCycle);
-    delay(2);
+    delay(5);
   }
 
   Serial.println("Init done!");
@@ -266,18 +321,26 @@ void loop() {
 
     display.clearDisplay();
     display.setTextSize(2);
-    display.setCursor(20, 0);
+    display.setCursor(25, 2);
     display.print("Dosage");
 
-    int barHeight = 30; // Progressbar height
-    int barWidth = map(drink_intensity, 0, 100, 0, SCREEN_WIDTH - 2);
-    int borderRadius = 5; // Radius of rounded corners
-    display.drawRoundRect(0, (SCREEN_HEIGHT - barHeight) / 2, SCREEN_WIDTH - 2, barHeight, borderRadius, SSD1306_WHITE);
+    int barHeight = 25; // Hauteur de la barre de progression
+    int barWidth = map(drink_intensity, 0, 100, 0, SCREEN_WIDTH - 2); // Largeur de la barre de progression en fonction de l'intensité de la boisson
+    int borderRadius = 5; // Rayon des coins arrondis
+    int borderWidth = 3; // Largeur de la bordure
+    int offsetY = 10;
 
-    // Fill-up progessbar with drink intensity value
-    display.fillRoundRect(1, (SCREEN_HEIGHT - barHeight) / 2 + 1, barWidth, barHeight - 2, borderRadius, SSD1306_WHITE); 
+    // Dessine le contour de la barre de progression
+    display.drawRoundRect(0, (SCREEN_HEIGHT - barHeight) / 2 + offsetY, SCREEN_WIDTH - 2, barHeight, borderRadius, SH110X_WHITE);
+    display.fillRoundRect(borderWidth, (SCREEN_HEIGHT - barHeight) / 2 + borderWidth + offsetY, barWidth - 2 * borderWidth, barHeight - 2 * borderWidth, borderRadius - borderWidth, SH110X_WHITE); 
     display.display();
 
+    if (drink_intensity == 0) {
+      display_message(8);
+    } 
+    if (drink_intensity == 100) {
+      display_message(7);
+    }
     // Update the last displayed intensity
     lastDisplayedIntensity = drink_intensity;
   }
