@@ -186,13 +186,13 @@ void process_actions(int choice) {
       Serial.println("-> Start&Clean");
       led_control(led_1);
       display_message(5);
-      set_pump_pwm(ALC_PUMP, ALC_PUMP_SPEED_MAX_PWM);
-      set_pump_pwm(WATER_PUMP, WATER_PUMP_SPEED_MAX_PWM);
-      fadeAnimation(5000);
-      set_pump_pwm(ALC_PUMP, 0);
-      display_message(6);
-      fadeAnimation(5000);
+      set_pump_pwm(WATER_PUMP, 255);
+      fadeAnimation(WATER_START_DURATION);
       set_pump_pwm(WATER_PUMP, 0);
+      set_pump_pwm(ALC_PUMP, 255);
+      display_message(6);
+      fadeAnimation(ALC_START_DURATION);
+      set_pump_pwm(ALC_PUMP, 0);
       display_message(0);
       break;
 
@@ -201,7 +201,8 @@ void process_actions(int choice) {
       Serial.println("-> Add water");
       led_control(led_2);
       display_message(2);
-      set_pump_pwm(WATER_PUMP, ONLY_WATER_SPEED);
+      // set_pump_pwm(WATER_PUMP, ONLY_WATER_SPEED);
+      set_pump_pwm(WATER_PUMP, map(drink_intensity, 0, 100, WATER_PUMP_SPEED_MIN_PWM, WATER_PUMP_SPEED_MAX_PWM));
       break;
 
     case 3:
@@ -209,7 +210,8 @@ void process_actions(int choice) {
       Serial.println("-> Add pastis");
       led_control(led_3);
       display_message(3);
-      set_pump_pwm(ALC_PUMP, ONLY_ALC_SPEED);
+      // set_pump_pwm(ALC_PUMP, ONLY_ALC_SPEED);
+      set_pump_pwm(ALC_PUMP, map(drink_intensity, 0, 100, ALC_PUMP_SPEED_MIN_PWM, ALC_PUMP_SPEED_MAX_PWM));
       break;
 
     case 4:
@@ -295,10 +297,6 @@ void setup() {
   digitalWrite(ALC_PUMP_IN3, LOW);
   digitalWrite(ALC_PUMP_IN4, HIGH);
 
-  // Open the valve to prime the pump
-  // it's not self-priming
-  valve_tank(true);
-
   led_control(allOn);
   delay(500);
   led_control(allOff);
@@ -316,7 +314,7 @@ void loop() {
   drink_intensity = map(analogRead(POTENTIOMETER), 0, 4095, 100, 0);
 
   // Check if the drink intensity has changed 
-  if (drink_intensity != lastDisplayedIntensity) {
+  if (abs(drink_intensity - lastDisplayedIntensity) >= 2) {
     Serial.println("Drink intensity = " + String(drink_intensity));
 
     display.clearDisplay();
@@ -335,10 +333,10 @@ void loop() {
     display.fillRoundRect(borderWidth, (SCREEN_HEIGHT - barHeight) / 2 + borderWidth + offsetY, barWidth - 2 * borderWidth, barHeight - 2 * borderWidth, borderRadius - borderWidth, SH110X_WHITE); 
     display.display();
 
-    if (drink_intensity == 0) {
+    if (drink_intensity <= 1) {
       display_message(8);
     } 
-    if (drink_intensity == 100) {
+    if (drink_intensity >= 99) {
       display_message(7);
     }
     // Update the last displayed intensity

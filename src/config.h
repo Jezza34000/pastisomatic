@@ -46,33 +46,31 @@
 
 /*
 Water/Alcool PWM adjustment constants
-Alcool pump 24V MAX
-Water pump 18V MAX
-Alimentation 24V (L298N voltage drop 2V) 
-MAX @100% PWM => 22V
+Alcool/Water pump 24V MAX
+Alimentation 22V (L298N voltage drop 2V) 
+MAX @100% PWM => 20V
 
-PWM 	Tension (V)
-0       0
-25      2,1
-50      4,3
-75      6,5
-100     8,6
-125     10,8
-150     13
-175     15,2
-200     17,3
-225     19,5
-250     21,7
-255     22
+Alcohol minimum speed => 95
+Water minimum speed => 105
+
+PWM (0-255)	Sortie (en volts)
+76	    6.0 V
+102	    8.0 V
+127	    9.8 V
+153	    12.0 V
+178	    14.0 V
+204	    16.0 V
+229	    18.0 V
+255	    20.0 V
 */
-#define ALC_PUMP_SPEED_MIN_PWM 50
-#define ALC_PUMP_SPEED_MAX_PWM 255
-#define WATER_PUMP_SPEED_MIN_PWM 125
-#define WATER_PUMP_SPEED_MAX_PWM 200
+#define ALC_PUMP_SPEED_MIN_PWM 95
+#define ALC_PUMP_SPEED_MAX_PWM 200
+#define WATER_PUMP_SPEED_MIN_PWM 255
+#define WATER_PUMP_SPEED_MAX_PWM 255
 
 // Throttle speed single use function
-#define ONLY_WATER_SPEED 150
-#define ONLY_ALC_SPEED 150
+#define ONLY_WATER_SPEED 200
+#define ONLY_ALC_SPEED 200
 
 // Start duration
 #define WATER_START_DURATION 3000
