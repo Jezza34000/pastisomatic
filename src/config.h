@@ -26,11 +26,11 @@
 #define POTENTIOMETER 36
 
 // L298N Pin PWM pumps
-#define WATER_PUMP 2 // ENA
+#define WATER_PUMP_PIN 2 // ENA
 #define WATER_PUMP_IN1 0
 #define WATER_PUMP_IN2 4
 
-#define ALC_PUMP 5 // ENB
+#define ALC_PUMP_PIN 5 // ENB
 #define ALC_PUMP_IN3 16
 #define ALC_PUMP_IN4 17
 
@@ -40,10 +40,15 @@
 #define LED_PWM_FREQ 5000   // PWM Frequency (Hz)
 #define LED_PWM_RESOLUTION 8 // PWM Resolution (bits)
 
-// PWM Motor Pump
-#define MOTORC_CHANNEL 8
-#define MOTOR_PWM_FREQ 10   // PWM Frequency (Hz)
-#define MOTOR_PWM_RESOLUTION 8 // PWM Resolution (bits)
+// PWM Alcohol pump
+#define ALC_PUMP 8
+#define ALC_PUMP_PWM_FREQ 10   // PWM Frequency (Hz)
+#define ALC_PUMP_PWM_RESOLUTION 8 // PWM Resolution (bits)
+
+// PWM Water pump
+#define WATER_PUMP 10
+#define WATER_PUMP_PWM_FREQ 5000   // PWM Frequency (Hz)
+#define WATER_PUMP_PWM_RESOLUTION 8 // PWM Resolution (bits)
 
 // Water tank valve
 #define TANK_VALVE_RELAY 19

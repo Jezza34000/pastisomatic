@@ -95,10 +95,10 @@ void display_message(int message) {
     case 7:
       display.setTextSize(3);
       display.setCursor(5, 10);
-      display.println("Non...");
+      display.println("Alerte");
       display.setTextSize(2);
       display.setCursor(5, 35);
-      display.println("Trop fort");
+      display.println("Flanby");
       break;
     case 8:
       display.setTextSize(3);
