@@ -25,13 +25,6 @@
 
 #define POTENTIOMETER 36
 
-// PWM Led
-#define PWM_FREQ 5000   // PWM Frequency (Hz)
-#define PWM_RESOLUTION 8 // PWM Resolution (bits)
-
-#define LEDC_CHANNEL 0        // Définir le canal LEDC à utiliser
-#define POTENTIOMETER_LED 23
-
 // L298N Pin PWM pumps
 #define WATER_PUMP 2 // ENA
 #define WATER_PUMP_IN1 0
@@ -40,6 +33,17 @@
 #define ALC_PUMP 5 // ENB
 #define ALC_PUMP_IN3 16
 #define ALC_PUMP_IN4 17
+
+// PWM Led
+#define LEDC_CHANNEL 0
+#define POTENTIOMETER_LED 23
+#define LED_PWM_FREQ 5000   // PWM Frequency (Hz)
+#define LED_PWM_RESOLUTION 8 // PWM Resolution (bits)
+
+// PWM Motor Pump
+#define MOTORC_CHANNEL 8
+#define MOTOR_PWM_FREQ 10   // PWM Frequency (Hz)
+#define MOTOR_PWM_RESOLUTION 8 // PWM Resolution (bits)
 
 // Water tank valve
 #define TANK_VALVE_RELAY 19
@@ -63,8 +67,8 @@ PWM (0-255)	Sortie (en volts)
 229	    18.0 V
 255	    20.0 V
 */
-#define ALC_PUMP_SPEED_MIN_PWM 95
-#define ALC_PUMP_SPEED_MAX_PWM 200
+#define ALC_PUMP_SPEED_MIN_PWM 10
+#define ALC_PUMP_SPEED_MAX_PWM 230
 #define WATER_PUMP_SPEED_MIN_PWM 255
 #define WATER_PUMP_SPEED_MAX_PWM 255
 
