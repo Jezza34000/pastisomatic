@@ -20,21 +20,21 @@ const bool led_4[NUM_LEDS] = {false, false, false, true};
 int lastDisplayedIntensity = -1;
 
 void led_control(const bool booleanList[NUM_LEDS]) {
-    for (int i = 0; i < NUM_LEDS; ++i) {
-        if (booleanList[i]) {
-            // Allumer la LED correspondante
-            digitalWrite(led_mapping[i], HIGH);
-            Serial.print("LED ");
-            Serial.print(i+1);
-            Serial.println(" allumée.");
-        } else {
-            // Éteindre la LED correspondante
-            digitalWrite(led_mapping[i], LOW);
-            Serial.print("LED ");
-            Serial.print(i+1);
-            Serial.println(" éteinte.");
-        }
+  for (int i = 0; i < NUM_LEDS; ++i) {
+    if (booleanList[i]) {
+        // Allumer la LED correspondante
+        digitalWrite(led_mapping[i], HIGH);
+        Serial.print("LED ");
+        Serial.print(i+1);
+        Serial.println(" allumée.");
+    } else {
+        // Éteindre la LED correspondante
+        digitalWrite(led_mapping[i], LOW);
+        Serial.print("LED ");
+        Serial.print(i+1);
+        Serial.println(" éteinte.");
     }
+  }
 }
 
 void display_message(int message) {

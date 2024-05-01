@@ -77,9 +77,12 @@ PWM (0-255)	Sortie (en volts)
 #define WATER_PUMP_SPEED_MIN_PWM 255
 #define WATER_PUMP_SPEED_MAX_PWM 255
 
+#define ALC_SOFT_PWM_MIN_DUTY 0
+#define ALC_SOFT_PWM_MAX_DUTY 100
+
 // Throttle speed single use function
-#define ONLY_WATER_SPEED 200
-#define ONLY_ALC_SPEED 200
+#define ONLY_WATER_SPEED 240
+#define ONLY_ALC_SPEED 100 
 
 // Start duration
 #define WATER_START_DURATION 3000
