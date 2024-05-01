@@ -2,10 +2,10 @@
 #include <Preferences.h>
 #include "config.h"
 #include "ihm.h"
-#include <WiFi.h>
-#include <WebServer.h>
+//#include <WiFi.h>
+//#include <WebServer.h>
 
-WebServer server(80);
+// WebServer server(80);
 
 // Load preferences
 Preferences preferences;
@@ -23,9 +23,9 @@ bool soft_pwm_ison = false;
 float dutyCycle = 0;
 int hard_pwm_value = 0;
 
-
-// Ajoutez cette variable globale
 bool lastButtonState[NUM_BUTTONS] = {HIGH, HIGH, HIGH, HIGH};
+bool buttonPressed = false;
+static bool noButtonWasPressed = false;
 
 int alcPumpSpeedMinPWM;
 int alcPumpSpeedMaxPWM;
@@ -43,18 +43,13 @@ int alcStartDuration;
 int alcoholPUMPfreq;
 int waterPUMPfreq;
 
-bool buttonPressed = false;
-static bool noButtonWasPressed = false;
-
 volatile int pumpSpeed = 0;
 volatile bool pumpState = false;
-
+/*
 IPAddress local_ip(192,168,0,1);
 IPAddress gateway(192,168,0,254);
 IPAddress subnet(255,255,255,0);
-
-hw_timer_t * timer = NULL;
-
+*/
 
 struct Button {
     const uint8_t PIN;
@@ -98,16 +93,6 @@ void IRAM_ATTR onTimer() {
   pumpState = !pumpState;
 }
 
-void set_pump_pwm_timer(int value) {
-  pumpSpeed = value;
-  if (value > 0) {
-    timerAlarmEnable(timer);
-  } else {
-    timerAlarmDisable(timer);
-    ledcWrite(ALC_PUMP, 0);
-    pumpState = false;
-  }
-}
 
 void set_pump_pwm(int motor_channel, int speed) {
   // Set L298N PWM pump
@@ -149,7 +134,6 @@ void process_actions(int btn_number) {
       set_soft_pump_pwm(false, 0, 0);
       set_pump_pwm(WATER_PUMP, 0);
       set_pump_pwm(ALC_PUMP, 0); 
-      set_pump_pwm_timer(0); 
       led_control(allOff);
       ledcWrite(LEDC_CHANNEL, 255);
       display_message(1);
@@ -256,6 +240,7 @@ void setup() {
 
 */
   
+/*
   // Wifi
   // Connect to your wi-fi modem
   display.println("- Wifi connecting...");
@@ -284,7 +269,7 @@ void setup() {
     display.display();
     Serial.println("WiFi connection failed");
   }
-
+*/
   preferences.begin("settings", false); // false indique de ne pas supprimer les préférences existantes
 
   alcPumpSpeedMinPWM = preferences.getInt("APS_MIN_PWM", ALC_PUMP_SPEED_MIN_PWM);
@@ -306,6 +291,9 @@ void setup() {
 
   display.println("- Param loaded");
   display.display();
+
+  preferences.putInt("A_STRT_DUR", 2800);
+  preferences.putInt("A_STRT_DUR", 2800);
 
   preferences.end();
   
@@ -355,13 +343,7 @@ void setup() {
 
   display.println("- Pin configured");
   display.display();
-
-  // Timer  
-
-  timer = timerBegin(0, 80, true);
-  timerAttachInterrupt(timer, &onTimer, true);
-  timerAlarmWrite(timer, 500000, true); // 0.5 second
-
+/*
   // Routes pour les pages web
   server.on("/", HTTP_GET, handleRoot);
   server.on("/save", HTTP_POST, handleSave);
@@ -372,7 +354,7 @@ void setup() {
 
   display.println("- Webserver started");
   display.display();
-
+*/
   start_animation();
   Serial.println("Init done!");
 }
@@ -412,7 +394,7 @@ void loop() {
   // Reading potentiometer value
   drink_intensity = map(analogRead(POTENTIOMETER), 0, 4095, 100, 0);
   display_intensity_bar(drink_intensity);
-  server.handleClient();
+  //server.handleClient();
 
   // Check buttons state
   for (int i = 0; i < sizeof(buttons) / sizeof(Button); i++) {
@@ -434,7 +416,7 @@ void loop() {
   soft_pwm();
 }
 
-
+/*
 void handleRoot() {
   String webpage = "<!DOCTYPE html>";
   webpage += "<html><head><title>Parametres Pastis-O-matic</title>";
@@ -552,3 +534,4 @@ void handleSave() {
 void handleReboot() {
   ESP.restart();
 }
+*/
