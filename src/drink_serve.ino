@@ -2,30 +2,32 @@
 #include <Preferences.h>
 #include "config.h"
 #include "ihm.h"
-//#include <WiFi.h>
-//#include <WebServer.h>
+#include "BluetoothSerial.h"
 
-// WebServer server(80);
+// Bluetooth
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
 
-// Load preferences
-Preferences preferences;
+BluetoothSerial SerialBT;
+String message = "";
 
 // Screen declaration
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // Global var
 int drink_intensity = 0; // % from 0 to 100
+volatile int pumpSpeed = 0;
 
-// Slow PWM
+// Software PWM
 unsigned long previousMillis = 0;
 bool pinState = false;
 bool soft_pwm_ison = false;
 float dutyCycle = 0;
 int hard_pwm_value = 0;
 
-bool lastButtonState[NUM_BUTTONS] = {HIGH, HIGH, HIGH, HIGH};
-bool buttonPressed = false;
-static bool noButtonWasPressed = false;
+// Load preferences
+Preferences preferences;
 
 int alcPumpSpeedMinPWM;
 int alcPumpSpeedMaxPWM;
@@ -43,13 +45,10 @@ int alcStartDuration;
 int alcoholPUMPfreq;
 int waterPUMPfreq;
 
-volatile int pumpSpeed = 0;
-volatile bool pumpState = false;
-/*
-IPAddress local_ip(192,168,0,1);
-IPAddress gateway(192,168,0,254);
-IPAddress subnet(255,255,255,0);
-*/
+// Button state
+bool lastButtonState[NUM_BUTTONS] = {HIGH, HIGH, HIGH, HIGH};
+bool buttonPressed = false;
+static bool noButtonWasPressed = false;
 
 struct Button {
     const uint8_t PIN;
@@ -62,6 +61,8 @@ Button buttons[] = {
     {BUTTON_3, false},
     {BUTTON_4, false}
 };
+
+// Interrupts functions
 
 void IRAM_ATTR updateButtonState(Button &button) {
     ets_printf("Interrup on button n°%d state is=%d\n", button.PIN, (digitalRead(button.PIN)));
@@ -83,16 +84,6 @@ void IRAM_ATTR fnc_btn3_add_pastis() {
 void IRAM_ATTR fnc_btn4_serve() {
     updateButtonState(buttons[3]);
 }
-
-void IRAM_ATTR onTimer() {
-  if (pumpSpeed > 0 && pumpState) {
-    ledcWrite(ALC_PUMP, pumpSpeed);
-  } else {
-    ledcWrite(ALC_PUMP, 0);
-  }
-  pumpState = !pumpState;
-}
-
 
 void set_pump_pwm(int motor_channel, int speed) {
   // Set L298N PWM pump
@@ -142,7 +133,6 @@ void process_actions(int btn_number) {
     case BUTTON_1:
       // Button 1 BACK-LEFT (Start&Clean)
       Serial.println("-> Start&Clean");
-      soft_pwm_ison = true;
       led_control(led_1);
       display_message(5);
       set_pump_pwm(WATER_PUMP, 255);
@@ -168,14 +158,12 @@ void process_actions(int btn_number) {
       Serial.println("-> Add pastis");
       led_control(led_3);
       display_message(3);
-      //set_soft_pump_pwm(true, drink_intensity, ONLY_ALC_SPEED);
-      set_pump_pwm(ALC_PUMP, onlyAlcSpeed); 
+      set_soft_pump_pwm(true, drink_intensity, map(drink_intensity, 0, 100, alcPumpSpeedMinPWM, alcPumpSpeedMaxPWM));
       break;
 
     case BUTTON_4:
       // Button 4 FRONT-RIGHT (Mix pastis+eau)
       Serial.println("-> Serve");
-      soft_pwm_ison = true;
       led_control(led_4);
       display_message(4);
       set_soft_pump_pwm(true, drink_intensity, map(drink_intensity, 0, 100, alcPumpSpeedMinPWM, alcPumpSpeedMaxPWM));
@@ -203,74 +191,8 @@ void setup() {
   display.println("Initializing...");
   display.display();
 
-  // Wifi
-/*
-  NOT WORKING
-
-  WiFi.disconnect(true);             // that no old information is stored  
-  WiFi.mode(WIFI_OFF);               // switch WiFi off  
-  delay(1000);                       // short wait to ensure WIFI_OFF  
-  WiFi.persistent(false);            // avoid that WiFi-parameters will be stored in persistent memory    
-  WiFi.softAPConfig(local_ip, gateway, subnet);   // configure AP with fixed IP-address   
-  delay(1000);     
-  WiFi.mode(WIFI_AP);                    //Access Point Only  
-  delay(1000);  
-  WiFi.persistent(false);                // avoid that congifuration is written to persistent memory  
-  WiFi.softAP("PastisOMatic", NULL);   // Start ESP as Access-Point  
-
-
-  display.println("- Wifi init...");
-  display.display();
-
-  WiFi.persistent(false);
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP("PastisOMatic", NULL);
-  delay(2000); 
-  WiFi.setTxPower(WIFI_POWER_5dBm);
-  WiFi.softAPConfig(local_ip, gateway, subnet);
-
-
-  delay(500);
-  IPAddress IP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(IP);
-
-  display.println("- Wifi OK");
-  display.display();
-
-*/
-  
-/*
-  // Wifi
-  // Connect to your wi-fi modem
-  display.println("- Wifi connecting...");
-  display.display();
-  WiFi.begin("Fbx-2.4", "fbxkey-FLHJOk8nUARi9t5TGVdlGKCC4TY49eXZfoBjf1Q31vrVdKK20ShaahgO");
-
-  unsigned long startTime = millis();
-  // Check wi-fi is connected to wi-fi network
-  while (WiFi.status() != WL_CONNECTED) {
-    if (millis() - startTime > 30000) {
-      Serial.println("Failed to connect to WiFi after 30 seconds");
-      break;
-    }
-    delay(1000);
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    display.println("- Wifi connected OK !");
-    display.display();
-    Serial.println("");
-    Serial.println("WiFi connected successfully");
-    Serial.print("Got IP: ");
-    Serial.println(WiFi.localIP());  //Show ESP32 IP on serial
-  } else {
-    display.println("- Wifi connection failed");
-    display.display();
-    Serial.println("WiFi connection failed");
-  }
-*/
-  preferences.begin("settings", false); // false indique de ne pas supprimer les préférences existantes
+  // Preferences init & load
+  preferences.begin("settings", false);
 
   alcPumpSpeedMinPWM = preferences.getInt("APS_MIN_PWM", ALC_PUMP_SPEED_MIN_PWM);
   alcPumpSpeedMaxPWM = preferences.getInt("APS_MAX_PWM", ALC_PUMP_SPEED_MAX_PWM);
@@ -291,9 +213,6 @@ void setup() {
 
   display.println("- Param loaded");
   display.display();
-
-  preferences.putInt("A_STRT_DUR", 2800);
-  preferences.putInt("A_STRT_DUR", 2800);
 
   preferences.end();
   
@@ -319,11 +238,11 @@ void setup() {
   ledcSetup(LEDC_CHANNEL, LED_PWM_FREQ, LED_PWM_RESOLUTION);
   ledcAttachPin(POTENTIOMETER_LED, LEDC_CHANNEL);
 
-  // Water pumpu PWM
+  // Water pump PWM
   ledcSetup(WATER_PUMP, waterPUMPfreq, WATER_PUMP_PWM_RESOLUTION);
   ledcAttachPin(WATER_PUMP_PIN, WATER_PUMP);
 
-  // Alcohol pumpu PWM
+  // Alcohol pump PWM
   ledcSetup(ALC_PUMP, alcoholPUMPfreq, ALC_PUMP_PWM_RESOLUTION);
   ledcAttachPin(ALC_PUMP_PIN, ALC_PUMP);
 
@@ -343,20 +262,24 @@ void setup() {
 
   display.println("- Pin configured");
   display.display();
-/*
-  // Routes pour les pages web
-  server.on("/", HTTP_GET, handleRoot);
-  server.on("/save", HTTP_POST, handleSave);
-  server.on("/reboot", HTTP_GET, handleReboot);
 
-  // Démarrer le serveur
-  server.begin();
-
-  display.println("- Webserver started");
-  display.display();
-*/
   start_animation();
   Serial.println("Init done!");
+
+  // Read the state of the buttons
+  bool button1State = digitalRead(BUTTON_2);
+  bool button2State = digitalRead(BUTTON_4);
+
+  // Check if both buttons are pressed
+  if (button1State == LOW && button2State == LOW) {
+    // Bluetooth init
+    SerialBT.begin("PastisOmatic"); //Bluetooth device name
+    display.println("-> Bluetooth OK");
+    display.display();
+    delay(1000);
+  }
+
+
 }
 
 void soft_pwm() {
@@ -381,20 +304,153 @@ void set_soft_pump_pwm(bool state, int soft_pwm, int hard_pwm) {
     soft_pwm_ison = true;
     hard_pwm_value = hard_pwm;
     dutyCycle = (float)map(soft_pwm, 0, 100, alcoholSoftMinPWM, alcoholSoftMaxPWM) / 100;
-    Serial.println("dutyCycle : " + String(dutyCycle) );
+    // Serial.println("soft_pwm=" + String(soft_pwm) + " hard_pwm=" + String(hard_pwm) + " dutyCycle=" + String(dutyCycle) );
   } else {
     soft_pwm_ison = false;
     dutyCycle = 0;
     hard_pwm_value = 0;
   }
   
+}  
+
+void bluetooth_gui() {
+  if (SerialBT.available()){
+    char incomingChar = SerialBT.read();
+    if (incomingChar != '\n'){
+      message += String(incomingChar);
+    } else {
+      process_command(message);
+      message = "";
+    }
+  }
+  ;
+}
+
+void split_string(const String& str, String& part1, String& part2, String& part3) {
+    int space1 = str.indexOf(' ');
+    int space2 = str.indexOf(' ', space1 + 1);
+
+    part1 = str.substring(0, space1);
+    part2 = str.substring(space1 + 1, space2);
+    part3 = str.substring(space2 + 1);
+}
+
+
+void process_command(String command) {
+    String part1, part2, part3;
+    split_string(command, part1, part2, part3);
+
+    Serial.println("Type=" + part1);
+    Serial.println("Param=" + part2);
+    Serial.println("Value=" + part3);
+
+    part1.trim();
+    part2.trim();
+    part3.trim();
+
+    if (part1 == "help") {
+      SerialBT.println("Available commands:");
+      SerialBT.println("help - Show this help message");
+      SerialBT.println("state - Show the current state of all values");
+      SerialBT.println("set param xx - Set the value of a parameter");
+      SerialBT.println("clear - Restore default values");
+      SerialBT.println("reboot - Reboot the device");
+      SerialBT.println("test alc - Test alcohol pump (with potentiometer value)");
+      SerialBT.println("stop - Stop pump");
+      SerialBT.println("stopbt - Stop Bluetooth");
+
+    } else if (part1 == "state") {
+      SerialBT.println("------------------------------------------------------");
+      SerialBT.println("### Alcohol pump");
+      SerialBT.println("1 - PWM hardware Min [25] (0-255): " + String(alcPumpSpeedMinPWM));
+      SerialBT.println("2 - PWM hardware Max [150] (0-255): " + String(alcPumpSpeedMaxPWM));
+      SerialBT.println("3 - PWM Frequency [10] (10-10000): " + String(alcoholPUMPfreq));
+      SerialBT.println("4 - PWM software Min [5] (10-100): " + String(alcoholSoftMinPWM));
+      SerialBT.println("5 - PWM software Max [50] (10-100): " + String(alcoholSoftMaxPWM));
+      SerialBT.println("6 - Only func speed [45] (0-255): " + String(onlyAlcSpeed));
+      SerialBT.println("------------------------------------------------------");
+      SerialBT.println("### Water pump");
+      SerialBT.println("7 - PWM hardware Min [255] (0-255): " + String(waterPumpSpeedMinPWM));
+      SerialBT.println("8 - PWM hardware Max [255] (0-255): " + String(waterPumpSpeedMaxPWM));
+      SerialBT.println("9 - PWM Frequency [5000] (10-10000): " + String(waterPUMPfreq));
+      SerialBT.println("10 - Only func speed [255] (0-255): " + String(onlyWaterSpeed));
+      SerialBT.println("------------------------------------------------------");
+      SerialBT.println("### Start & Clean");
+      SerialBT.println("11 - Water duration [2400] (1000-9000): " + String(waterStartDuration));
+      SerialBT.println("12 - Alcohol duration [2800] (1000-9000): " + String(alcStartDuration));
+      SerialBT.println("------------------------------------------------------");
+
+    } else if (part1 == "clear") {
+        preferences.begin("settings", false);
+        preferences.clear();
+        preferences.end();
+        SerialBT.println("Preferences cleared !");
+        delay(10);
+        ESP.restart();
+
+    } else if (part1 == "reboot") {
+        SerialBT.println("Reboot...");
+        delay(10);
+        ESP.restart();
+
+    } else if (part1 == "stopbt") {
+        SerialBT.println("Disabling Bluetooth...");
+        delay(10);
+        SerialBT.end();
+
+    } else if (part1 == "stop") {
+      SerialBT.println("Stop");
+      process_actions(0);
+
+    } else if (part1 == "set" && part2 != "" && part3 != "") {
+        preferences.begin("settings", false);
+        if (part2 == "1") {
+            alcPumpSpeedMinPWM = part3.toInt();
+            preferences.putInt("APS_MIN_PWM", alcPumpSpeedMinPWM);
+        } else if (part2 == "2") {
+            alcPumpSpeedMaxPWM = part3.toInt();
+            preferences.putInt("APS_MAX_PWM", alcPumpSpeedMaxPWM);
+        } else if (part2 == "3") {
+            alcoholPUMPfreq = part3.toInt();
+            preferences.putInt("ALC_PWM_FREQ", alcoholPUMPfreq);
+        } else if (part2 == "4") {
+            alcoholSoftMinPWM = part3.toInt();
+            preferences.putInt("SFT_PW_MIN", alcoholSoftMinPWM);
+        } else if (part2 == "5") {
+            alcoholSoftMaxPWM = part3.toInt();
+            preferences.putInt("SFT_PW_MAX", alcoholSoftMaxPWM);
+        } else if (part2 == "6") {
+            onlyAlcSpeed = part3.toInt();
+            preferences.putInt("ONLY_ALC_SPEED", onlyAlcSpeed);
+        } else if (part2 == "7") {
+            waterPumpSpeedMinPWM = part3.toInt();
+            preferences.putInt("WPS_MIN_PWM", waterPumpSpeedMinPWM);
+        } else if (part2 == "8") {
+            waterPumpSpeedMaxPWM = part3.toInt();
+            preferences.putInt("WPS_MAX_PWM", waterPumpSpeedMaxPWM);
+        } else if (part2 == "9") {
+            waterPUMPfreq = part3.toInt();
+            preferences.putInt("WATER_PWM_FREQ", waterPUMPfreq);
+        } else if (part2 == "10") {
+            onlyWaterSpeed = part3.toInt();
+            preferences.putInt("ONLY_WTR_SPEED", onlyWaterSpeed);
+        } else if (part2 == "11") {
+            waterStartDuration = part3.toInt();
+            preferences.putInt("W_STRT_DUR", waterStartDuration);
+        } else if (part2 == "12") {
+            alcStartDuration = part3.toInt();
+            preferences.putInt("A_STRT_DUR", alcStartDuration);
+        }
+        preferences.end();
+        SerialBT.println("Updated OK");
+    }
 }
 
 void loop() {
   // Reading potentiometer value
-  drink_intensity = map(analogRead(POTENTIOMETER), 0, 4095, 100, 0);
+  int potValue = analogRead(POTENTIOMETER);
+  drink_intensity = map(potValue, 0, 4095, 100, 0);
   display_intensity_bar(drink_intensity);
-  //server.handleClient();
 
   // Check buttons state
   for (int i = 0; i < sizeof(buttons) / sizeof(Button); i++) {
@@ -413,125 +469,7 @@ void loop() {
     }
     lastButtonState[i] = currentButtonState;
   }
+
   soft_pwm();
+  bluetooth_gui();
 }
-
-/*
-void handleRoot() {
-  String webpage = "<!DOCTYPE html>";
-  webpage += "<html><head><title>Parametres Pastis-O-matic</title>";
-  webpage += "<style>#saveButton {font-size: 20px;}</style>";
-  webpage += "</head><body>";
-  webpage += "<h1>Parametres Pastis-O-matic</h1>";
-  webpage += "<form action='/save' method='POST'>";
-
-  webpage += "<hr><h2>Alcohol pump:</h2>";
-
-  webpage += "<label for='alcoholSoftMinPWM'>Soft PWM Min:</label>";
-  webpage += "<output id='alcSoftMinPWM'>" + String(alcoholSoftMinPWM) + "</output>";
-  webpage += "<input type='range' id='alcoholSoftMinPWM' name='alcoholSoftMinPWM' min='0' max='100' value='" + String(alcoholSoftMinPWM) + "' oninput='alcSoftMinPWM.value = this.value'><br>";
-
-  webpage += "<label for='alcoholSoftMaxPWM'>Soft PWM Max:</label>";
-  webpage += "<output id='alcSoftMaxPWM'>" + String(alcoholSoftMaxPWM) + "</output>";
-  webpage += "<input type='range' id='alcoholSoftMaxPWM' name='alcoholSoftMaxPWM' min='0' max='100' value='" + String(alcoholSoftMaxPWM) + "' oninput='alcSoftMaxPWM.value = this.value'><br>";
-
-  webpage += "<label for='alcPumpSpeedMinPWM'>Hard PWM Min :</label>";
-  webpage += "<output id='alcPumpMinValue'>" + String(alcPumpSpeedMinPWM) + "</output>";
-  webpage += "<input type='range' id='alcPumpSpeedMinPWM' name='alcPumpSpeedMinPWM' min='0' max='255' value='" + String(alcPumpSpeedMinPWM) + "' oninput='alcPumpMinValue.value = this.value'><br>";
-
-  webpage += "<label for='alcPumpSpeedMaxPWM'>Hard PWM Max :</label>";
-  webpage += "<output id='alcPumpMaxValue'>" + String(alcPumpSpeedMaxPWM) + "</output>";
-  webpage += "<input type='range' id='alcPumpSpeedMaxPWM' name='alcPumpSpeedMaxPWM' min='0' max='255' value='" + String(alcPumpSpeedMaxPWM) + "' oninput='alcPumpMaxValue.value = this.value'><br>";
-
-  webpage += "<label for='alcoholPUMPfreq'>Frequency :</label>";
-  webpage += "<output id='alcPumpFrequencyValue'>" + String(alcoholPUMPfreq) + "</output>";
-  webpage += "<input type='range' id='alcoholPUMPfreq' name='alcoholPUMPfreq' min='10' max='10000' step='10' value='" + String(alcoholPUMPfreq) + "' oninput='alcPumpFrequencyValue.value = this.value'> (reboot required)<br>";
-  webpage += "<label for='onlyAlcSpeed'>Speed single func :</label>";
-  webpage += "<output id='onlyAlcSpeedValue'>" + String(onlyAlcSpeed) + "</output>";
-  webpage += "<input type='range' id='onlyAlcSpeed' name='onlyAlcSpeed' min='0' max='255' step='1' value='" + String(onlyAlcSpeed) + "' oninput='onlyAlcSpeedValue.value = this.value'><br>";
-
-  webpage += "<hr><h2>Water pump:</h2>";
-  webpage += "<label for='waterPumpSpeedMinPWM'>Min :</label>";
-  webpage += "<output id='waterPumpMinValue'>" + String(waterPumpSpeedMinPWM) + "</output>";
-  webpage += "<input type='range' id='waterPumpSpeedMinPWM' name='waterPumpSpeedMinPWM' min='0' max='255' value='" + String(waterPumpSpeedMinPWM) + "' oninput='waterPumpMinValue.value = this.value'><br>";
-  webpage += "<label for='waterPumpSpeedMaxPWM'>Max :</label>";
-  webpage += "<output id='waterPumpMaxValue'>" + String(waterPumpSpeedMaxPWM) + "</output>";
-  webpage += "<input type='range' id='waterPumpSpeedMaxPWM' name='waterPumpSpeedMaxPWM' min='0' max='255' value='" + String(waterPumpSpeedMaxPWM) + "' oninput='waterPumpMaxValue.value = this.value'><br>";
-  webpage += "<label for='waterPUMPfreq'>Frequency :</label>";
-  webpage += "<output id='waterPumpFrequencyValue'>" + String(waterPUMPfreq) + "</output>";
-  webpage += "<input type='range' id='waterPUMPfreq' name='waterPUMPfreq' min='10' max='10000' step='10' value='" + String(waterPUMPfreq) + "' oninput='waterPumpFrequencyValue.value = this.value'> (reboot required)<br>";
-  webpage += "<label for='onlyWaterSpeed'>Speed single func :</label>";
-  webpage += "<output id='onlyWaterSpeedValue'>" + String(onlyWaterSpeed) + "</output>";
-  webpage += "<input type='range' id='onlyWaterSpeed' name='onlyWaterSpeed' min='0' max='255' step='1' value='" + String(onlyWaterSpeed) + "' oninput='onlyWaterSpeedValue.value = this.value'><br>";
-  
-  webpage += "<hr><h2>Start/Clean:</h2>";
-  webpage += "<label for='waterStartDuration'>Water time :</label>";
-  webpage += "<output id='waterStartDurationValue'>" + String(waterStartDuration) + "</output>";
-  webpage += "<input type='range' id='waterStartDuration' name='waterStartDuration' min='0' max='10000' step='500' value='" + String(waterStartDuration) + "' oninput='waterStartDurationValue.value = this.value'><br>";
-  webpage += "<label for='alcStartDuration'>Alcohol time :</label>";
-  webpage += "<output id='alcStartDurationValue'>" + String(alcStartDuration) + "</output>";
-  webpage += "<input type='range' id='alcStartDuration' name='alcStartDuration' min='0' max='10000' step='500' value='" + String(alcStartDuration) + "' oninput='alcStartDurationValue.value = this.value'><br>";
-
-  webpage += "<hr><input id='saveButton' type='submit' value='Save'>";
-  webpage += "<hr></form>";
-  webpage += "<form action='/reboot' method='GET'>";
-  webpage += "<input type='submit' value='Reboot'>";
-  webpage += "</form><hr></body></html>";
-  server.send(200, "text/html", webpage);
-}
-
-// Gestion de l'enregistrement
-void handleSave() {
-  if (server.args() > 0) {
-    // Ouvrir l'espace de stockage de préférences avec l'identifiant "settings"
-    preferences.begin("settings", false); // false indique de ne pas supprimer les préférences existantes
-
-    // Mettre à jour les valeurs des paramètres
-    alcPumpSpeedMinPWM = server.arg("alcPumpSpeedMinPWM").toInt();
-    alcPumpSpeedMaxPWM = server.arg("alcPumpSpeedMaxPWM").toInt();
-    waterPumpSpeedMinPWM = server.arg("waterPumpSpeedMinPWM").toInt();
-    waterPumpSpeedMaxPWM = server.arg("waterPumpSpeedMaxPWM").toInt();
-    alcoholPUMPfreq = server.arg("alcoholPUMPfreq").toInt();
-    waterPUMPfreq = server.arg("waterPUMPfreq").toInt();
-    onlyAlcSpeed = server.arg("onlyAlcSpeed").toInt();
-    onlyWaterSpeed = server.arg("onlyWaterSpeed").toInt();
-
-    alcoholSoftMinPWM = server.arg("alcoholSoftMinPWM").toInt();
-    alcoholSoftMaxPWM = server.arg("alcoholSoftMaxPWM").toInt();
-
-    waterStartDuration = server.arg("waterStartDuration").toInt();
-    alcStartDuration = server.arg("alcStartDuration").toInt();
-
-    // Enregistrer les nouvelles valeurs dans les préférences
-    preferences.putInt("APS_MIN_PWM", alcPumpSpeedMinPWM);
-    preferences.putInt("APS_MAX_PWM", alcPumpSpeedMaxPWM);
-    preferences.putInt("WPS_MIN_PWM", waterPumpSpeedMinPWM);
-    preferences.putInt("WPS_MAX_PWM", waterPumpSpeedMaxPWM);
-
-    preferences.putInt("ALC_PWM_FREQ", alcoholPUMPfreq);
-    preferences.putInt("WATER_PWM_FREQ", waterPUMPfreq);
-
-    preferences.putInt("ONLY_ALC_SPEED", onlyAlcSpeed);
-    preferences.putInt("ONLY_WTR_SPEED", onlyWaterSpeed);
-
-    preferences.putInt("W_STRT_DUR", waterStartDuration);
-    preferences.putInt("A_STRT_DUR", alcStartDuration);
-
-    preferences.putInt("SFT_PW_MIN", alcoholSoftMinPWM);
-    preferences.putInt("SFT_PW_MAX", alcoholSoftMaxPWM);
-
-    // Fermer l'espace de stockage de préférences
-    preferences.end();
-
-    // Rediriger vers la page d'accueil après l'enregistrement
-    server.sendHeader("Location", String("/"), true);
-    server.send(302, "text/plain", "");
-  } else {
-    server.send(400, "text/plain", "Bad Request");
-  }
-}
-
-void handleReboot() {
-  ESP.restart();
-}
-*/

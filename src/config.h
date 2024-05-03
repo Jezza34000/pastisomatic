@@ -72,20 +72,25 @@ PWM (0-255)	Sortie (en volts)
 229	    18.0 V
 255	    20.0 V
 */
-#define ALC_PUMP_SPEED_MIN_PWM 10
-#define ALC_PUMP_SPEED_MAX_PWM 230
+
+// Water pump HARDWARE PWM Min/Max
 #define WATER_PUMP_SPEED_MIN_PWM 255
 #define WATER_PUMP_SPEED_MAX_PWM 255
 
-#define ALC_SOFT_PWM_MIN_DUTY 0
-#define ALC_SOFT_PWM_MAX_DUTY 100
+// Alcohol pump HARDWARE PWM Min/Max
+#define ALC_PUMP_SPEED_MIN_PWM 25
+#define ALC_PUMP_SPEED_MAX_PWM 150
+
+// Alcohol pump SOFTWARE PWM Min/Max
+#define ALC_SOFT_PWM_MIN_DUTY 5
+#define ALC_SOFT_PWM_MAX_DUTY 50
 
 // Throttle speed single use function
-#define ONLY_WATER_SPEED 240
-#define ONLY_ALC_SPEED 100 
+#define ONLY_WATER_SPEED 255
+#define ONLY_ALC_SPEED 45 
 
 // Start duration
-#define WATER_START_DURATION 3000
-#define ALC_START_DURATION 3000
+#define WATER_START_DURATION 2400
+#define ALC_START_DURATION 2800
 
 #endif // CONFIG_H
