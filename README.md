@@ -23,7 +23,7 @@ Le projet utilise un distributeur à eau chaude variable comme base, dont l'int�
 
 ## Schéma 
 
-
+![schema](https://github.com/Jezza34000/pastisomatic/blob/main/img/schema.png?raw=true)
 
 ## Fonctionnement
 
